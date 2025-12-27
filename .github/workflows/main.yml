@@ -1,7 +1,6 @@
 name: Rb m/25 System Controller
 
 on:
-  # 手動で実行するための設定（Actionsタブからボタンで起動可能）
   workflow_dispatch:
     inputs:
       action_type:
@@ -22,12 +21,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Node.js環境のセットアップ
+      # 2. Node.js環境のセットアップ (エラー回避のためキャッシュを無効化)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
 
       # 3. 依存ライブラリのインストール
       - name: Install Dependencies
@@ -41,12 +39,12 @@ jobs:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
 
-      # 5. Bot起動 (runを選択した場合)
+      # 5. Bot起動 (runを選択した場合、またはpush時)
       - name: Start Rb m/25 Bot
-        if: ${{ github.event.inputs.action_type == 'run' || github.event == 'push' }}
+        if: ${{ github.event.inputs.action_type == 'run' || github.event_name == 'push' }}
         run: node main.js
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }} # Ledger(Gist)操作用
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           GIST_ID: ${{ secrets.GIST_ID }}
