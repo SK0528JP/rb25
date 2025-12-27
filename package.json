@@ -1,0 +1,16 @@
+{
+  "name": "rb25",
+  "version": "1.0.0",
+  "description": "Multi-server Discord Bot: Rb m/25",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.13.0",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=16.9.0"
+  }
+}
