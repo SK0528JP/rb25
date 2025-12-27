@@ -1,0 +1,52 @@
+name: Rb m/25 System Controller
+
+on:
+  # 手動で実行するための設定（Actionsタブからボタンで起動可能）
+  workflow_dispatch:
+    inputs:
+      action_type:
+        description: '実行するアクションを選択'
+        required: true
+        default: 'run'
+        type: choice
+        options:
+          - run     # Botを起動する
+          - deploy  # コマンドをDiscordに登録する
+
+jobs:
+  control-system:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. ソースコードの取得
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Node.js環境のセットアップ
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      # 3. 依存ライブラリのインストール
+      - name: Install Dependencies
+        run: npm install
+
+      # 4. コマンド登録 (deployを選択した場合)
+      - name: Deploy Slash Commands
+        if: ${{ github.event.inputs.action_type == 'deploy' }}
+        run: node deploy-commands.js
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+
+      # 5. Bot起動 (runを選択した場合)
+      - name: Start Rb m/25 Bot
+        if: ${{ github.event.inputs.action_type == 'run' || github.event == 'push' }}
+        run: node main.js
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }} # Ledger(Gist)操作用
+          GIST_ID: ${{ secrets.GIST_ID }}
