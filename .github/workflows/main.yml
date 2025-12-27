@@ -1,6 +1,9 @@
-name: Rb m/25 System Controller
+name: Rb m/25 Perpetual Relay
 
 on:
+  schedule:
+    # 5時間ごとに起動 (0, 5, 10, 15, 20時 UTC)
+    - cron: '0 */5 * * *'
   workflow_dispatch:
     inputs:
       action_type:
@@ -9,29 +12,30 @@ on:
         default: 'run'
         type: choice
         options:
-          - run     # Botを起動する
-          - deploy  # コマンドをDiscordに登録する
+          - run
+          - deploy
+  push:
+    branches: [ main ]
 
 jobs:
-  control-system:
+  patrol:
     runs-on: ubuntu-latest
+    # ジョブの最大寿命を330分（5時間30分）に設定
+    # 次のジョブが起動した後、30分間だけ重なりながら古い方が消滅する
+    timeout-minutes: 330 
 
     steps:
-      # 1. ソースコードの取得
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Node.js環境のセットアップ (エラー回避のためキャッシュを無効化)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      # 3. 依存ライブラリのインストール
       - name: Install Dependencies
         run: npm install
 
-      # 4. コマンド登録 (deployを選択した場合)
       - name: Deploy Slash Commands
         if: ${{ github.event.inputs.action_type == 'deploy' }}
         run: node deploy-commands.js
@@ -39,9 +43,9 @@ jobs:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
 
-      # 5. Bot起動 (runを選択した場合、またはpush時)
       - name: Start Rb m/25 Bot
-        if: ${{ github.event.inputs.action_type == 'run' || github.event_name == 'push' }}
+        if: ${{ github.event.inputs.action_type != 'deploy' }}
+        # タイムアウトまでプロセスを維持し続ける
         run: node main.js
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
