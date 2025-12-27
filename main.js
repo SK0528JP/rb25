@@ -1,52 +1,94 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
-require('dotenv').config();
+const { Client, GatewayIntentBits, Collection, ActivityType } = require('discord.js');
+const dotenv = require('dotenv');
 
-// 1. Clientインスタンスの生成
+// 環境変数の読み込み
+dotenv.config();
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers,
     ],
 });
 
-// 2. コマンド格納用のコレクションを作成
+// コマンドを格納するコレクション
 client.commands = new Collection();
 
-// 3. commandsフォルダからコマンドファイルを読み込む
+// 1. コマンドファイルの読み込み
 const commandsPath = path.join(__dirname, 'commands');
-// フォルダが存在しない場合のエラー回避
-if (!fs.existsSync(commandsPath)) {
-    fs.mkdirSync(commandsPath);
-}
-
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-
-for (const file of commandFiles) {
-    const filePath = path.join(commandsPath, file);
-    const command = require(filePath);
-    
-    // コマンドファイルに必要なプロパティがあるか確認して登録
-    if ('data' in command && 'execute' in command) {
-        client.commands.set(command.data.name, command);
-        console.log(`[LOADED]: /${command.data.name}`);
-    } else {
-        console.log(`[WARNING]: ${filePath} には 'data' または 'execute' プロパティがありません。`);
+if (fs.existsSync(commandsPath)) {
+    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+    for (const file of commandFiles) {
+        const filePath = path.join(commandsPath, file);
+        const command = require(filePath);
+        if ('data' in command && 'execute' in command) {
+            client.commands.set(command.data.name, command);
+            console.log(`[Loaded]: ${command.data.name}`);
+        }
     }
+} else {
+    console.error("❌ 'commands' フォルダが見つかりません。");
 }
 
-// 4. スラッシュコマンド（Interaction）の受け取り設定
-client.on(Events.InteractionCreate, async interaction => {
-    // チャットコマンド以外は無視
+// 2. 起動時の処理
+client.once('ready', async () => {
+    // 状態を「退席中 (idle)」に設定
+    client.user.setStatus('idle');
+
+    // ステータス（アクティビティ）を更新する関数
+    const updateStatus = () => {
+        // 日本時間 (JST) の取得
+        const now = new Date();
+        const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+        
+        const year = jstNow.getUTCFullYear();
+        const month = jstNow.getUTCMonth() + 1;
+        const date = jstNow.getUTCDate();
+        const dayList = ["日", "月", "火", "水", "木", "金", "土"];
+        const day = dayList[jstNow.getUTCDay()];
+        
+        // 稼働時間 (Uptime) の計算
+        const totalSeconds = (client.uptime / 1000);
+        const days = Math.floor(totalSeconds / 86400);
+        const hours = Math.floor((totalSeconds % 86400) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const uptimeStr = `${days}d ${hours}h ${minutes}m`;
+
+        // 遅延 (Ping)
+        const ping = client.ws.ping;
+
+        // ステータステキストの構築 (m/25E 仕様)
+        // 例: 2025/12/27(土) | Up: 0d 0h 5m | 42ms
+        const statusText = `${year}/${month}/${date}(${day}) | Up: ${uptimeStr} | ${ping}ms`;
+
+        client.user.setActivity(statusText, { type: ActivityType.Watching });
+    };
+
+    // 初回実行
+    updateStatus();
+    
+    // 1分ごとにステータスを更新
+    setInterval(updateStatus, 60000);
+
+    console.log('-----------------------------------');
+    console.log('Rb m/25 (Generic Edition)');
+    console.log('System Mode: Perpetual Patrol');
+    console.log('Status: Idle (Away)');
+    console.log(`Logged in as: ${client.user.tag}`);
+    console.log('-----------------------------------');
+});
+
+// 3. インタラクション（コマンド）の受信
+client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    const command = interaction.client.commands.get(interaction.commandName);
+    const command = client.commands.get(interaction.commandName);
 
     if (!command) {
-        console.error(`${interaction.commandName} というコマンドは見つかりませんでした。`);
+        console.error(`Command ${interaction.commandName} not found.`);
         return;
     }
 
@@ -62,14 +104,5 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
-// 5. 起動時イベント
-client.once(Events.ClientReady, c => {
-    console.log('-----------------------------------');
-    console.log(`Rb m/25 (Generic Edition)`);
-    console.log(`Status: Online`);
-    console.log(`Logged in as: ${c.user.tag}`);
-    console.log('-----------------------------------');
-});
-
-// 6. ログイン
+// Discord へのログイン
 client.login(process.env.DISCORD_TOKEN);
