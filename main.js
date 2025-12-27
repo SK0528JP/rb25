@@ -29,54 +29,62 @@ if (fs.existsSync(commandsPath)) {
             console.log(`[Loaded]: ${command.data.name}`);
         }
     }
-} else {
-    console.error("❌ 'commands' フォルダが見つかりません。");
 }
 
 // 2. 起動時の処理
 client.once('ready', async () => {
-    // 状態を「退席中 (idle)」に設定
+    // 状態を「退席中 (idle)」に固定
     client.user.setStatus('idle');
 
-    // ステータス（アクティビティ）を更新する関数
+    // システムステータス更新関数
     const updateStatus = () => {
-        // 日本時間 (JST) の取得
-        const now = new Date();
-        const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-        
-        const year = jstNow.getUTCFullYear();
-        const month = jstNow.getUTCMonth() + 1;
-        const date = jstNow.getUTCDate();
-        const dayList = ["日", "月", "火", "水", "木", "金", "土"];
-        const day = dayList[jstNow.getUTCDay()];
-        
-        // 稼働時間 (Uptime) の計算
-        const totalSeconds = (client.uptime / 1000);
-        const days = Math.floor(totalSeconds / 86400);
-        const hours = Math.floor((totalSeconds % 86400) / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const uptimeStr = `${days}d ${hours}h ${minutes}m`;
+        try {
+            // 日本時間 (JST) の取得
+            const now = new Date();
+            const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+            
+            const year = jstNow.getUTCFullYear();
+            const month = jstNow.getUTCMonth() + 1;
+            const date = jstNow.getUTCDate();
+            
+            const hoursTime = String(jstNow.getUTCHours()).padStart(2, '0');
+            const minutesTime = String(jstNow.getUTCMinutes()).padStart(2, '0');
+            const secondsTime = String(jstNow.getUTCSeconds()).padStart(2, '0');
+            
+            const dayList = ["日", "月", "火", "水", "木", "金", "土"];
+            const day = dayList[jstNow.getUTCDay()];
+            
+            // 稼働時間 (Uptime) の計算
+            const uptimeTotalMs = client.uptime;
+            const d = Math.floor(uptimeTotalMs / 86400000);
+            const h = Math.floor((uptimeTotalMs % 86400000) / 3600000);
+            const m = Math.floor((uptimeTotalMs % 3600000) / 60000);
+            const s = Math.floor((uptimeTotalMs % 60000) / 1000);
+            const uptimeStr = `${d}d ${h}h ${m}m ${s}s`;
 
-        // 遅延 (Ping)
-        const ping = client.ws.ping;
+            // 遅延 (Ping)
+            const ping = client.ws.ping;
 
-        // ステータステキストの構築 (m/25E 仕様)
-        // 例: 2025/12/27(土) | Up: 0d 0h 5m | 42ms
-        const statusText = `${year}/${month}/${date}(${day}) | Up: ${uptimeStr} | ${ping}ms`;
+            // ステータステキストの構築
+            // 例: 2025/12/27(土) 12:45:05 | Up: 0d 0h 5m 5s | 42ms
+            const statusText = `${year}/${month}/${date}(${day}) ${hoursTime}:${minutesTime}:${secondsTime} | Up: ${uptimeStr} | ${ping}ms`;
 
-        client.user.setActivity(statusText, { type: ActivityType.Watching });
+            client.user.setActivity(statusText, { type: ActivityType.Watching });
+        } catch (err) {
+            console.error('Status update error:', err);
+        }
     };
 
     // 初回実行
     updateStatus();
     
-    // 1分ごとにステータスを更新
-    setInterval(updateStatus, 60000);
+    // 5000ミリ秒（5秒）ごとに更新を実行
+    setInterval(updateStatus, 5000);
 
     console.log('-----------------------------------');
     console.log('Rb m/25 (Generic Edition)');
-    console.log('System Mode: Perpetual Patrol');
-    console.log('Status: Idle (Away)');
+    console.log('System Mode: Stable Perpetual Patrol');
+    console.log('Update Interval: 5000ms');
     console.log(`Logged in as: ${client.user.tag}`);
     console.log('-----------------------------------');
 });
@@ -84,25 +92,20 @@ client.once('ready', async () => {
 // 3. インタラクション（コマンド）の受信
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
-
     const command = client.commands.get(interaction.commandName);
-
-    if (!command) {
-        console.error(`Command ${interaction.commandName} not found.`);
-        return;
-    }
+    if (!command) return;
 
     try {
         await command.execute(interaction);
     } catch (error) {
         console.error(error);
+        const errorMsg = { content: 'コマンド実行中にエラーが発生しました。', ephemeral: true };
         if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({ content: 'コマンド実行中にエラーが発生しました。', ephemeral: true });
+            await interaction.followUp(errorMsg);
         } else {
-            await interaction.reply({ content: 'コマンド実行中にエラーが発生しました。', ephemeral: true });
+            await interaction.reply(errorMsg);
         }
     }
 });
 
-// Discord へのログイン
 client.login(process.env.DISCORD_TOKEN);
